@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from datetime import datetime, timedelta, date
+import time
 
 # --- FIREBASE SETUP ---
 import firebase_admin
@@ -10,6 +11,14 @@ from firebase_admin import firestore
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="Gestão Confeitaria", layout="wide", page_icon="🍰")
+
+# ==========================================
+# 🔐 CONFIGURAÇÃO DE ACESSO (ADMIN)
+# ==========================================
+# Defina aqui o login do dono do sistema
+ADMIN_EMAIL = "brenner@admin.com"  # <--- SEU EMAIL DE ACESSO
+ADMIN_SENHA = "123"                # <--- SUA SENHA
+# ==========================================
 
 # --- INICIALIZAÇÃO FIREBASE COM SECRETS ---
 if not firebase_admin._apps:
@@ -23,47 +32,80 @@ if not firebase_admin._apps:
 
 db = firestore.client()
 
-# --- CSS GLOBAL (Design System Red Velvet) ---
-st.markdown("""
-    <style>
-    .stApp { background-color: #0E1117; }
-    
-    /* Inputs e Selects */
-    .stTextInput > div > div > input, .stSelectbox > div > div > div {
-        color: white;
-    }
-    
-    /* Cards de Métricas */
-    div[data-testid="stMetric"] {
-        background-color: #1A1C24; border: 1px solid #2D2F3B;
-        padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3);
-    }
-    div[data-testid="stMetricLabel"] { color: #9CA3AF !important; }
-    div[data-testid="stMetricValue"] { color: #FFFFFF !important; font-weight: 700; }
-    
-    /* Tabs */
-    .stTabs [data-baseweb="tab-list"] { gap: 15px; background-color: transparent; padding-bottom: 10px; }
-    .stTabs [data-baseweb="tab"] {
-        height: 45px; background-color: transparent; border: 1px solid #4B5563;
-        border-radius: 30px; color: #E5E7EB; font-weight: 600;
-        padding: 0 20px; transition: all 0.3s ease;
-    }
-    .stTabs [data-baseweb="tab"][aria-selected="true"] {
-        background-color: #C62828; color: white; border: 1px solid #C62828;
-        box-shadow: 0 4px 10px rgba(198, 40, 40, 0.3);
-    }
-    
-    /* Botões */
-    .stButton > button {
-        background-color: #C62828; color: white; border-radius: 8px;
-        border: none; font-weight: bold; height: 45px; transition: 0.3s;
-        width: 100%;
-    }
-    .stButton > button:hover { background-color: #B71C1C; box-shadow: 0 2px 8px rgba(198, 40, 40, 0.4); }
-    
-    h1, h2, h3 { color: #F3F4F6; font-family: 'Inter', sans-serif; }
-    </style>
-    """, unsafe_allow_html=True)
+# ==========================================
+# 🎨 TEMA E ESTILO (DARK/LIGHT MODE)
+# ==========================================
+if "tema_claro" not in st.session_state:
+    st.session_state.tema_claro = False
+
+def aplicar_estilo(tema_light):
+    if tema_light:
+        bg_color = "#FFFFFF"
+        text_color = "#1F2937"
+        card_bg = "#F3F4F6"
+        card_border = "#E5E7EB"
+        metric_label = "#4B5563"
+        metric_value = "#111827"
+        input_text = "#000000"
+    else:
+        bg_color = "#0E1117"
+        text_color = "#F3F4F6"
+        card_bg = "#1A1C24"
+        card_border = "#2D2F3B"
+        metric_label = "#9CA3AF"
+        metric_value = "#FFFFFF"
+        input_text = "#FFFFFF"
+
+    st.markdown(f"""
+        <style>
+        .stApp {{ background-color: {bg_color}; }}
+        
+        h1, h2, h3, h4, p, label, .stMarkdown, .stRadio label {{ color: {text_color} !important; font-family: 'Inter', sans-serif; }}
+        
+        /* Inputs */
+        .stTextInput > div > div > input, 
+        .stSelectbox > div > div > div, 
+        .stNumberInput > div > div > input,
+        .stTextArea > div > div > textarea {{
+            color: {input_text} !important;
+            background-color: {card_bg} !important;
+            border-color: {card_border} !important;
+        }}
+        
+        /* Cards de Métricas e Pedidos */
+        div[data-testid="stMetric"], .card-pedido {{
+            background-color: {card_bg} !important; 
+            border: 1px solid {card_border} !important;
+            padding: 20px; border-radius: 12px; 
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        }}
+        div[data-testid="stMetricLabel"] {{ color: {metric_label} !important; }}
+        div[data-testid="stMetricValue"] {{ color: {metric_value} !important; font-weight: 700; }}
+        
+        /* Tabs */
+        .stTabs [data-baseweb="tab-list"] {{ gap: 15px; background-color: transparent; padding-bottom: 10px; }}
+        .stTabs [data-baseweb="tab"] {{
+            height: 45px; background-color: transparent; border: 1px solid #4B5563;
+            border-radius: 30px; color: {metric_label}; font-weight: 600;
+            padding: 0 20px; transition: all 0.3s ease;
+        }}
+        .stTabs [data-baseweb="tab"][aria-selected="true"] {{
+            background-color: #C62828; color: white !important; border: 1px solid #C62828;
+            box-shadow: 0 4px 10px rgba(198, 40, 40, 0.3);
+        }}
+        
+        /* Botões */
+        .stButton > button {{
+            background-color: #C62828; color: white !important; border-radius: 8px;
+            border: none; font-weight: bold; height: 45px; transition: 0.3s;
+            width: 100%;
+        }}
+        .stButton > button:hover {{ background-color: #B71C1C; box-shadow: 0 2px 8px rgba(198, 40, 40, 0.4); }}
+        
+        </style>
+        """, unsafe_allow_html=True)
+
+aplicar_estilo(st.session_state.tema_claro)
 
 # --- FUNÇÕES FIRESTORE (Compartilhadas) ---
 def load_collection(collection_name, mes_ref=None, order_by=None):
@@ -108,15 +150,16 @@ def get_doc(collection_name, doc_id):
     return None
 
 # ==========================================
-# 🛒 ÁREA DO CLIENTE (CATÁLOGO ONLINE)
+# 🛒 ROTEAMENTO (O QUE MOSTRAR NA TELA)
 # ==========================================
 query_params = st.query_params
 modo_visualizacao = query_params.get("view", ["admin"]) 
 if isinstance(modo_visualizacao, list): modo_visualizacao = modo_visualizacao[0]
 
+# --- 1. SE FOR CATÁLOGO CLIENTE (ACESSO PÚBLICO) ---
 if modo_visualizacao == "catalogo_cliente":
     st.markdown("<h2 style='text-align: center;'>🍰 Faça seu Pedido</h2>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: gray;'>Preencha os dados abaixo para solicitar</p>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; opacity: 0.7;'>Preencha os dados abaixo para solicitar</p>", unsafe_allow_html=True)
     
     # Carregar produtos com estoque
     df_prods = load_collection('produtos_finais')
@@ -129,94 +172,123 @@ if modo_visualizacao == "catalogo_cliente":
         st.info("No momento estamos sem estoque disponível. Volte em breve! ❤️")
         st.stop()
 
-    with st.form("form_pedido_cliente"):
-        st.subheader("1. Seus Dados")
-        c_nome, c_tel = st.columns(2)
-        with c_nome: cli_nome = st.text_input("Seu Nome Completo")
-        with c_tel: cli_tel = st.text_input("Seu WhatsApp/Telefone")
+    st.subheader("1. Seus Dados")
+    c_nome, c_tel = st.columns(2)
+    with c_nome: cli_nome = st.text_input("Seu Nome Completo")
+    with c_tel: cli_tel = st.text_input("Seu WhatsApp/Telefone")
 
-        st.subheader("2. Escolha o Produto")
-        opcoes = {}
-        # Cria um dicionário para mapear a string do selectbox para o objeto produto
-        for idx, row in df_disponiveis.iterrows():
-            qtd_real = int(row['estoque_pronto'])
-            label = f"{row['nome']} | R$ {row['preco_venda']:.2f} (Disponível: {qtd_real})"
-            opcoes[label] = row
+    st.subheader("2. Escolha o Produto")
+    opcoes = {}
+    for idx, row in df_disponiveis.iterrows():
+        qtd_real = int(row['estoque_pronto'])
+        label = f"{row['nome']} | R$ {row['preco_venda']:.2f} (Disponível: {qtd_real})"
+        opcoes[label] = row
 
-        produto_selecionado_label = st.selectbox("Selecione uma delícia:", list(opcoes.keys()))
-        produto_obj = opcoes[produto_selecionado_label]
+    produto_selecionado_label = st.selectbox("Selecione uma delícia:", list(opcoes.keys()))
+    produto_obj = opcoes[produto_selecionado_label]
+    
+    qtd_cliente = st.number_input("Quantidade desejada", min_value=1, step=1)
+    
+    st.subheader("3. Pagamento")
+    forma_pag = st.selectbox("Como deseja pagar?", ["Pix", "Dinheiro", "Cartão Crédito/Débito", "A Combinar"])
+    
+    obs = st.text_area("Observações (Opcional)", placeholder="Ex: Retiro às 15h, troco para 50...")
+
+    st.markdown("---")
+    
+    if st.button("✅ ENVIAR PEDIDO AGORA", use_container_width=True):
+        if not cli_nome or not cli_tel:
+            st.error("⚠️ Por favor, preencha seu NOME e TELEFONE antes de enviar.")
+            st.stop()
+
+        item_atualizado = get_doc('produtos_finais', produto_obj['id'])
+        if not item_atualizado:
+            st.error("Erro: Produto não encontrado ou removido.")
+            st.stop()
         
-        # Input de Quantidade
-        # Nota: O max_value ajuda na UI, mas a validação real será feita no botão Enviar
-        qtd_cliente = st.number_input("Quantidade desejada", min_value=1, step=1)
+        estoque_real = int(item_atualizado['estoque_pronto'])
         
-        st.subheader("3. Pagamento")
-        forma_pag = st.selectbox("Como deseja pagar?", ["Pix", "Dinheiro", "Cartão Crédito/Débito", "A Combinar"])
+        if qtd_cliente > estoque_real:
+            st.error(f"🛑 ATENÇÃO: Você pediu {qtd_cliente}, mas só temos {estoque_real} unidades no estoque.")
+            st.warning("Por favor, diminua a quantidade e tente novamente.")
+            st.stop() 
+
+        total_pedido = item_atualizado['preco_venda'] * qtd_cliente
+        mes_atual = date.today().strftime("%Y-%m")
+
+        add_doc('vendas', {
+            'produto_final_id': item_atualizado['id'], 
+            'produto_nome': item_atualizado['nome'], 
+            'cliente_nome': cli_nome, 
+            'cliente_telefone': cli_tel,
+            'quantidade': qtd_cliente, 
+            'total_venda': total_pedido, 
+            'custo_producao_momento': item_atualizado['custo_producao'], 
+            'data_criacao': datetime.now().isoformat(), 
+            'data_finalizacao': None, 
+            'forma_pagamento': forma_pag, 
+            'status': 'Pendente', 
+            'mes_referencia': mes_atual,
+            'origem': 'Link Online',
+            'obs': obs
+        })
         
-        obs = st.text_area("Observações (Opcional)", placeholder="Ex: Retiro às 15h, troco para 50...")
-
-        submitted = st.form_submit_button("✅ Enviar Pedido")
-
-        if submitted:
-            # 1. Validação de Campos
-            if not cli_nome or not cli_tel:
-                st.error("⚠️ Por favor, preencha seu NOME e TELEFONE antes de enviar.")
-                st.stop()
-
-            # 2. VALIDAÇÃO RIGOROSA DE ESTOQUE (AQUI É A CORREÇÃO)
-            # Buscamos o dado DIRETO do banco agora mesmo
-            item_atualizado = get_doc('produtos_finais', produto_obj['id'])
-            
-            if not item_atualizado:
-                st.error("Erro: Produto não encontrado ou removido.")
-                st.stop()
-            
-            estoque_real = int(item_atualizado['estoque_pronto'])
-            
-            # --- O IF QUE BLOQUEIA TUDO ---
-            if qtd_cliente > estoque_real:
-                st.error(f"🛑 ATENÇÃO: Você pediu {qtd_cliente}, mas só temos {estoque_real} unidades no estoque.")
-                st.warning("Por favor, diminua a quantidade e tente novamente.")
-                st.stop() # ESSE COMANDO IMPEDE QUE O CÓDIGO CONTINUE E SALVE O PEDIDO
-
-            # 3. Se passou da barreira acima, pode salvar
-            total_pedido = item_atualizado['preco_venda'] * qtd_cliente
-            mes_atual = date.today().strftime("%Y-%m")
-
-            add_doc('vendas', {
-                'produto_final_id': item_atualizado['id'], 
-                'produto_nome': item_atualizado['nome'], 
-                'cliente_nome': cli_nome, 
-                'cliente_telefone': cli_tel,
-                'quantidade': qtd_cliente, 
-                'total_venda': total_pedido, 
-                'custo_producao_momento': item_atualizado['custo_producao'], 
-                'data_criacao': datetime.now().isoformat(), 
-                'data_finalizacao': None, 
-                'forma_pagamento': forma_pag, 
-                'status': 'Pendente', 
-                'mes_referencia': mes_atual,
-                'origem': 'Link Online',
-                'obs': obs
-            })
-            
-            # Baixar Estoque
-            update_doc('produtos_finais', item_atualizado['id'], {
-                'estoque_pronto': estoque_real - qtd_cliente
-            })
-            
-            st.balloons()
-            st.success(f"Pedido Realizado com Sucesso! Obrigado, {cli_nome}.")
-            st.info("Entraremos em contato pelo WhatsApp para confirmar.")
+        update_doc('produtos_finais', item_atualizado['id'], {
+            'estoque_pronto': estoque_real - qtd_cliente
+        })
+        
+        st.balloons()
+        st.success(f"Pedido Realizado com Sucesso! Obrigado, {cli_nome}.")
+        time.sleep(2)
+        st.rerun()
 
     st.markdown("---")
     st.caption("Sistema de Pedidos Confeitaria")
-    st.stop()
+    st.stop() 
 
 
 # ==========================================
-# 🔐 ÁREA DO VENDEDOR (ADMIN)
+# 🔐 ÁREA DO VENDEDOR (ADMIN) - PROTEGIDA
 # ==========================================
+
+# --- VERIFICAÇÃO DE LOGIN ---
+if 'admin_logado' not in st.session_state:
+    st.session_state.admin_logado = False
+
+if not st.session_state.admin_logado:
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    col_l, col_c, col_r = st.columns([1, 2, 1])
+    with col_c:
+        st.markdown("<h3 style='text-align: center;'>🔐 Acesso Restrito</h3>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center; color: gray;'>Identifique-se para acessar o painel</p>", unsafe_allow_html=True)
+        
+        # --- FORMULÁRIO DE LOGIN ---
+        email_digitado = st.text_input("E-mail de Acesso")
+        senha_digitada = st.text_input("Senha", type="password")
+        
+        if st.button("Entrar no Sistema", use_container_width=True):
+            if email_digitado == ADMIN_EMAIL and senha_digitada == ADMIN_SENHA:
+                st.session_state.admin_logado = True
+                st.rerun()
+            else:
+                st.error("E-mail ou senha incorretos.")
+    st.stop() # PARA AQUI SE NÃO TIVER LOGADO
+
+# --- SE CHEGOU AQUI, É O ADMIN ---
+
+# Sidebar com Configurações
+st.sidebar.title("⚙️ Configurações")
+toggle_tema = st.sidebar.toggle("☀️ Modo Claro (Light Mode)", value=st.session_state.tema_claro)
+if toggle_tema != st.session_state.tema_claro:
+    st.session_state.tema_claro = toggle_tema
+    st.rerun() 
+
+if st.sidebar.button("🔒 Sair / Logout"):
+    st.session_state.admin_logado = False
+    st.rerun()
+
+st.sidebar.markdown("---")
+st.sidebar.caption("Painel do Vendedor")
 
 # --- DATAS ---
 def get_month_options():
@@ -255,11 +327,7 @@ def popup_novo_insumo():
         st.success("Salvo!")
         st.rerun()
 
-# --- SIDEBAR ---
-st.sidebar.title("🍰 Gestão Admin")
-st.sidebar.caption("Painel do Vendedor")
-st.sidebar.markdown("---")
-
+# --- SIDEBAR FILTROS ---
 meses_disponiveis = get_month_options()
 mes_atual_default = date.today().strftime("%Y-%m")
 if mes_atual_default not in meses_disponiveis:
@@ -268,11 +336,10 @@ if mes_atual_default not in meses_disponiveis:
 mes_selecionado = st.sidebar.selectbox("📅 Mês de Competência", meses_disponiveis, index=meses_disponiveis.index(mes_atual_default) if mes_atual_default in meses_disponiveis else 0)
 st.sidebar.info(f"Mês Ativo: **{mes_selecionado}**")
 
-# --- GERADOR DE LINK LIMPO ---
+# --- GERADOR DE LINK ---
 st.sidebar.markdown("---")
 st.sidebar.subheader("🔗 Link para Clientes")
 link_para_copiar = "https://projetofinanceirobrener.streamlit.app/?view=catalogo_cliente"
-
 st.sidebar.markdown("Clique no ícone **no canto direito** abaixo para copiar:")
 st.sidebar.code(link_para_copiar, language="text") 
 
@@ -534,45 +601,52 @@ with aba4:
                     st.rerun()
                 else: st.error(f"Estoque insuficiente! Disponível: {item['estoque_pronto']}")
 
-# --- ABA 5: PEDIDOS ABERTOS ---
+# --- ABA 5: PEDIDOS ABERTOS (COM AUTO-REFRESH) ---
 with aba5:
     st.subheader("✅ Gerenciar Entregas")
-    ref_vendas = db.collection('vendas')
-    query = ref_vendas.where('mes_referencia', '==', mes_selecionado).where('status', '==', 'Pendente')
-    pendentes = [{'id': d.id, **d.to_dict()} for d in query.stream()]
-    pendentes.sort(key=lambda x: x['data_criacao'], reverse=True)
-    
-    if pendentes:
-        st.caption(f"Pendentes: {len(pendentes)}")
-        for ped in pendentes:
-            with st.container():
-                # Layout do Card
-                st.markdown(f"""
-                <div style="background-color: #262730; padding: 15px; border-radius: 10px; border: 1px solid #333; margin-bottom: 10px;">
-                    <h4 style="margin:0; color: #FFF;">{ped['cliente_nome']}</h4>
-                    <p style="margin:0; color: #AAA; font-size: 14px;">📞 {ped.get('cliente_telefone', 'Sem fone')}</p>
-                    <p style="margin:5px 0; color: #E5E7EB; font-weight: bold;">{ped['quantidade']}x {ped['produto_nome']} | R$ {ped['total_venda']:.2f}</p>
-                    <p style="margin:0; font-size: 12px; color: #CCC;">Pagamento: {ped['forma_pagamento']} | Origem: {ped.get('origem', 'Link Online')}</p>
-                    {f'<p style="color: #F87171; font-size: 12px;">Obs: {ped["obs"]}</p>' if ped.get('obs') else ''}
-                </div>
-                """, unsafe_allow_html=True)
+    st.caption("Esta tela atualiza sozinha a cada 15 segundos.")
 
-                c_btn_ok, c_btn_can = st.columns([1, 1])
-                with c_btn_ok:
-                    if st.button("Concluir ✅", key=f"ok_{ped['id']}", use_container_width=True):
-                        update_doc('vendas', ped['id'], {'status': 'Finalizado', 'data_finalizacao': date.today().isoformat()})
-                        st.toast("Finalizado!")
-                        st.rerun()
-                with c_btn_can:
-                    if st.button("Cancelar ❌", key=f"can_{ped['id']}", use_container_width=True):
-                        prod = get_doc('produtos_finais', ped['produto_final_id'])
-                        if prod: update_doc('produtos_finais', ped['produto_final_id'], {'estoque_pronto': prod['estoque_pronto'] + ped['quantidade']})
-                        delete_doc('vendas', ped['id'])
-                        st.warning("Cancelado e estornado.")
-                        st.rerun()
-                st.write("")
-    else: st.info("Tudo entregue!")
+    @st.fragment(run_every=15)
+    def mostrar_pedidos_abertos():
+        ref_vendas = db.collection('vendas')
+        query = ref_vendas.where('mes_referencia', '==', mes_selecionado).where('status', '==', 'Pendente')
+        pendentes = [{'id': d.id, **d.to_dict()} for d in query.stream()]
+        pendentes.sort(key=lambda x: x['data_criacao'], reverse=True)
+        
+        if pendentes:
+            st.info(f"Pendentes Agora: {len(pendentes)}")
+            for ped in pendentes:
+                with st.container():
+                    st.markdown(f"""
+                    <div class="card-pedido">
+                        <h4 style="margin:0;">{ped['cliente_nome']}</h4>
+                        <p style="margin:0; opacity: 0.7; font-size: 14px;">📞 {ped.get('cliente_telefone', 'Sem fone')}</p>
+                        <p style="margin:5px 0; font-weight: bold;">{ped['quantidade']}x {ped['produto_nome']} | R$ {ped['total_venda']:.2f}</p>
+                        <p style="margin:0; font-size: 12px; opacity: 0.6;">Pagamento: {ped['forma_pagamento']} | Origem: {ped.get('origem', 'Link Online')}</p>
+                        {f'<p style="color: #F87171; font-size: 12px;">Obs: {ped["obs"]}</p>' if ped.get('obs') else ''}
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                    c_btn_ok, c_btn_can = st.columns([1, 1])
+                    with c_btn_ok:
+                        if st.button("Concluir ✅", key=f"ok_{ped['id']}", use_container_width=True):
+                            update_doc('vendas', ped['id'], {'status': 'Finalizado', 'data_finalizacao': date.today().isoformat()})
+                            st.toast("Finalizado!")
+                            st.rerun()
+                    with c_btn_can:
+                        if st.button("Cancelar ❌", key=f"can_{ped['id']}", use_container_width=True):
+                            prod = get_doc('produtos_finais', ped['produto_final_id'])
+                            if prod: update_doc('produtos_finais', ped['produto_final_id'], {'estoque_pronto': prod['estoque_pronto'] + ped['quantidade']})
+                            delete_doc('vendas', ped['id'])
+                            st.warning("Cancelado e estornado.")
+                            st.rerun()
+                    st.write("")
+        else:
+            st.success("Tudo entregue! Aguardando novos pedidos...")
+
+    mostrar_pedidos_abertos()
     
+    st.markdown("---")
     with st.expander("Histórico de Entregues"):
         df_fin = load_collection('vendas', mes_selecionado)
         if not df_fin.empty:
