@@ -106,10 +106,8 @@ def get_doc(collection_name, doc_id):
 # ==========================================
 # 🛒 ÁREA DO CLIENTE (CATÁLOGO ONLINE)
 # ==========================================
-# Verifica se a URL tem ?view=catalogo_cliente
 query_params = st.query_params
 modo_visualizacao = query_params.get("view", ["admin"]) 
-# Nota: st.query_params retorna string ou lista dependendo da versao, tratativa simples abaixo:
 if isinstance(modo_visualizacao, list): modo_visualizacao = modo_visualizacao[0]
 
 if modo_visualizacao == "catalogo_cliente":
@@ -133,7 +131,6 @@ if modo_visualizacao == "catalogo_cliente":
         cli_tel = st.text_input("Seu WhatsApp/Telefone")
 
         st.subheader("2. Escolha o Produto")
-        # Criar uma lista formatada para o selectbox
         opcoes = {}
         for idx, row in df_disponiveis.iterrows():
             label = f"{row['nome']} | R$ {row['preco_venda']:.2f} (Disp: {int(row['estoque_pronto'])})"
@@ -152,18 +149,12 @@ if modo_visualizacao == "catalogo_cliente":
             if not cli_nome or not cli_tel:
                 st.error("Por favor, preencha seu nome e telefone.")
             else:
-                # Verificar estoque novamente (segurança contra cliques simultâneos)
                 item_atualizado = get_doc('produtos_finais', produto_obj['id'])
                 
                 if item_atualizado['estoque_pronto'] >= qtd_cliente:
-                    # Calcular Total
                     total_pedido = item_atualizado['preco_venda'] * qtd_cliente
                     mes_atual = date.today().strftime("%Y-%m")
 
-                    # Salvar Cliente se não existir (opcional, mas bom pra base)
-                    # Aqui apenas salvamos no pedido para simplificar
-                    
-                    # Criar Venda
                     add_doc('vendas', {
                         'produto_final_id': item_atualizado['id'], 
                         'produto_nome': item_atualizado['nome'], 
@@ -181,7 +172,6 @@ if modo_visualizacao == "catalogo_cliente":
                         'obs': obs
                     })
                     
-                    # Baixar Estoque
                     update_doc('produtos_finais', item_atualizado['id'], {
                         'estoque_pronto': item_atualizado['estoque_pronto'] - qtd_cliente
                     })
@@ -193,7 +183,7 @@ if modo_visualizacao == "catalogo_cliente":
 
     st.markdown("---")
     st.caption("Sistema de Pedidos Confeitaria")
-    st.stop() # Para a execução aqui, não carrega o painel administrativo
+    st.stop()
 
 
 # ==========================================
@@ -242,7 +232,6 @@ st.sidebar.title("🍰 Gestão Admin")
 st.sidebar.caption("Painel do Vendedor")
 st.sidebar.markdown("---")
 
-# Seleção de Mês
 meses_disponiveis = get_month_options()
 mes_atual_default = date.today().strftime("%Y-%m")
 if mes_atual_default not in meses_disponiveis:
@@ -251,36 +240,16 @@ if mes_atual_default not in meses_disponiveis:
 mes_selecionado = st.sidebar.selectbox("📅 Mês de Competência", meses_disponiveis, index=meses_disponiveis.index(mes_atual_default) if mes_atual_default in meses_disponiveis else 0)
 st.sidebar.info(f"Mês Ativo: **{mes_selecionado}**")
 
-# --- NOVO: GERADOR DE LINK ---
+# --- GERADOR DE LINK LIMPO ---
 st.sidebar.markdown("---")
 st.sidebar.subheader("🔗 Link para Clientes")
-st.sidebar.caption("Envie este link para seu cliente fazer o pedido:")
+# Aqui definimos o link fixo
+link_para_copiar = "https://projetofinanceirobrener.streamlit.app/?view=catalogo_cliente"
 
-# Tenta pegar a URL base, se não conseguir, instrui o usuário
-try:
-    # Gambiarra para pegar URL local ou cloud de forma genérica se possível
-    # Mas o mais seguro é pedir pro usuário copiar a base
-    base_url_exemplo = "https://seu-app.streamlit.app"
-    st.markdown("""
-    <style>
-    .link-box {
-        background-color: #262730;
-        padding: 10px;
-        border-radius: 5px;
-        border: 1px solid #4B5563;
-        font-size: 12px;
-        word-break: break-all;
-        color: #4ADE80;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-    
-    link_final = "?view=catalogo_cliente"
-    st.markdown(f"Adicione isso ao final do link do seu site: **{link_final}**")
-    st.code(f"{link_final}", language="text")
-    st.caption("Exemplo: se seu site é `confeitaria.streamlit.app`, envie: `confeitaria.streamlit.app/?view=catalogo_cliente`")
-except:
-    pass
+st.sidebar.markdown("Clique no ícone **no canto direito** abaixo para copiar:")
+# language='text' remove formatação de código colorido, deixando limpo
+st.sidebar.code(link_para_copiar, language="text") 
+
 
 # --- ABAS ---
 aba1, aba2, aba3, aba4, aba5 = st.tabs([
