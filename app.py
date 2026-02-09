@@ -16,8 +16,8 @@ st.set_page_config(page_title="Gestão Confeitaria", layout="wide", page_icon="�
 # 🔐 CONFIGURAÇÃO DE ACESSO (ADMIN)
 # ==========================================
 # Defina aqui o login do dono do sistema
-ADMIN_EMAIL = "brenner@admin.com"  # <--- SEU EMAIL DE ACESSO
-ADMIN_SENHA = "123"                # <--- SUA SENHA
+ADMIN_EMAIL = "brenerstephano2@gmail.com"  # <--- SEU EMAIL DE ACESSO
+ADMIN_SENHA = "33979864"                # <--- SUA SENHA
 # ==========================================
 
 # --- INICIALIZAÇÃO FIREBASE COM SECRETS ---
