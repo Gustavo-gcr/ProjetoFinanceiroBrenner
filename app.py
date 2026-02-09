@@ -99,9 +99,14 @@ def update_doc(collection_name, doc_id, data):
 def delete_doc(collection_name, doc_id):
     if doc_id: db.collection(collection_name).document(doc_id).delete()
 
+# --- CORREÇÃO AQUI: A função get_doc agora retorna o ID ---
 def get_doc(collection_name, doc_id):
     doc = db.collection(collection_name).document(doc_id).get()
-    return doc.to_dict() if doc.exists else None
+    if doc.exists:
+        d = doc.to_dict()
+        d['id'] = doc.id  # Adicionamos o ID manualmente ao dicionário
+        return d
+    return None
 
 # ==========================================
 # 🛒 ÁREA DO CLIENTE (CATÁLOGO ONLINE)
@@ -149,9 +154,10 @@ if modo_visualizacao == "catalogo_cliente":
             if not cli_nome or not cli_tel:
                 st.error("Por favor, preencha seu nome e telefone.")
             else:
+                # Busca item atualizado para garantir que ainda tem estoque
                 item_atualizado = get_doc('produtos_finais', produto_obj['id'])
                 
-                if item_atualizado['estoque_pronto'] >= qtd_cliente:
+                if item_atualizado and item_atualizado['estoque_pronto'] >= qtd_cliente:
                     total_pedido = item_atualizado['preco_venda'] * qtd_cliente
                     mes_atual = date.today().strftime("%Y-%m")
 
@@ -179,7 +185,7 @@ if modo_visualizacao == "catalogo_cliente":
                     st.success(f"Pedido Realizado! Obrigado, {cli_nome}. Entraremos em contato.")
                     st.balloons()
                 else:
-                    st.error("Poxa! Alguém acabou de comprar as últimas unidades desse produto. Atualize a página.")
+                    st.error("Poxa! Alguém acabou de comprar as últimas unidades desse produto ou ele foi removido.")
 
     st.markdown("---")
     st.caption("Sistema de Pedidos Confeitaria")
@@ -243,11 +249,9 @@ st.sidebar.info(f"Mês Ativo: **{mes_selecionado}**")
 # --- GERADOR DE LINK LIMPO ---
 st.sidebar.markdown("---")
 st.sidebar.subheader("🔗 Link para Clientes")
-# Aqui definimos o link fixo
 link_para_copiar = "https://projetofinanceirobrener.streamlit.app/?view=catalogo_cliente"
 
 st.sidebar.markdown("Clique no ícone **no canto direito** abaixo para copiar:")
-# language='text' remove formatação de código colorido, deixando limpo
 st.sidebar.code(link_para_copiar, language="text") 
 
 
