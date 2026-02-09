@@ -146,9 +146,9 @@ if modo_visualizacao == "catalogo_cliente":
         produto_selecionado_label = st.selectbox("Selecione uma delícia:", list(opcoes.keys()))
         produto_obj = opcoes[produto_selecionado_label]
         
-        # Input de Quantidade (UI limita, mas backend valida também)
-        max_stock_ui = int(produto_obj['estoque_pronto'])
-        qtd_cliente = st.number_input("Quantidade desejada", min_value=1, max_value=max_stock_ui, step=1)
+        # Input de Quantidade
+        # Nota: O max_value ajuda na UI, mas a validação real será feita no botão Enviar
+        qtd_cliente = st.number_input("Quantidade desejada", min_value=1, step=1)
         
         st.subheader("3. Pagamento")
         forma_pag = st.selectbox("Como deseja pagar?", ["Pix", "Dinheiro", "Cartão Crédito/Débito", "A Combinar"])
@@ -161,10 +161,10 @@ if modo_visualizacao == "catalogo_cliente":
             # 1. Validação de Campos
             if not cli_nome or not cli_tel:
                 st.error("⚠️ Por favor, preencha seu NOME e TELEFONE antes de enviar.")
-                st.stop() # Para tudo aqui
+                st.stop()
 
-            # 2. Validação Rigorosa de Estoque (Backend Check)
-            # Busca o dado fresquinho do banco para garantir que ninguém comprou na frente
+            # 2. VALIDAÇÃO RIGOROSA DE ESTOQUE (AQUI É A CORREÇÃO)
+            # Buscamos o dado DIRETO do banco agora mesmo
             item_atualizado = get_doc('produtos_finais', produto_obj['id'])
             
             if not item_atualizado:
@@ -173,11 +173,13 @@ if modo_visualizacao == "catalogo_cliente":
             
             estoque_real = int(item_atualizado['estoque_pronto'])
             
+            # --- O IF QUE BLOQUEIA TUDO ---
             if qtd_cliente > estoque_real:
-                st.error(f"🚫 Ops! Estoque insuficiente. Você pediu {qtd_cliente}, mas agora só temos {estoque_real} unidade(s).")
-                st.stop() # TRAVA ABSOLUTA: O código para aqui e NÃO salva nada.
+                st.error(f"🛑 ATENÇÃO: Você pediu {qtd_cliente}, mas só temos {estoque_real} unidades no estoque.")
+                st.warning("Por favor, diminua a quantidade e tente novamente.")
+                st.stop() # ESSE COMANDO IMPEDE QUE O CÓDIGO CONTINUE E SALVE O PEDIDO
 
-            # 3. Se passou da barreira acima, processa o pedido
+            # 3. Se passou da barreira acima, pode salvar
             total_pedido = item_atualizado['preco_venda'] * qtd_cliente
             mes_atual = date.today().strftime("%Y-%m")
 
@@ -550,7 +552,7 @@ with aba5:
                     <h4 style="margin:0; color: #FFF;">{ped['cliente_nome']}</h4>
                     <p style="margin:0; color: #AAA; font-size: 14px;">📞 {ped.get('cliente_telefone', 'Sem fone')}</p>
                     <p style="margin:5px 0; color: #E5E7EB; font-weight: bold;">{ped['quantidade']}x {ped['produto_nome']} | R$ {ped['total_venda']:.2f}</p>
-                    <p style="margin:0; font-size: 12px; color: #CCC;">Pagamento: {ped['forma_pagamento']} | Origem: {ped.get('origem', 'Balcão')}</p>
+                    <p style="margin:0; font-size: 12px; color: #CCC;">Pagamento: {ped['forma_pagamento']} | Origem: {ped.get('origem', 'Link Online')}</p>
                     {f'<p style="color: #F87171; font-size: 12px;">Obs: {ped["obs"]}</p>' if ped.get('obs') else ''}
                 </div>
                 """, unsafe_allow_html=True)
