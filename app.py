@@ -99,12 +99,11 @@ def update_doc(collection_name, doc_id, data):
 def delete_doc(collection_name, doc_id):
     if doc_id: db.collection(collection_name).document(doc_id).delete()
 
-# --- CORREÇÃO AQUI: A função get_doc agora retorna o ID ---
 def get_doc(collection_name, doc_id):
     doc = db.collection(collection_name).document(doc_id).get()
     if doc.exists:
         d = doc.to_dict()
-        d['id'] = doc.id  # Adicionamos o ID manualmente ao dicionário
+        d['id'] = doc.id
         return d
     return None
 
@@ -117,7 +116,7 @@ if isinstance(modo_visualizacao, list): modo_visualizacao = modo_visualizacao[0]
 
 if modo_visualizacao == "catalogo_cliente":
     st.markdown("<h2 style='text-align: center;'>🍰 Faça seu Pedido</h2>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: gray;'>Selecione os produtos disponíveis abaixo</p>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: gray;'>Preencha os dados abaixo para solicitar</p>", unsafe_allow_html=True)
     
     # Carregar produtos com estoque
     df_prods = load_collection('produtos_finais')
@@ -132,60 +131,81 @@ if modo_visualizacao == "catalogo_cliente":
 
     with st.form("form_pedido_cliente"):
         st.subheader("1. Seus Dados")
-        cli_nome = st.text_input("Seu Nome Completo")
-        cli_tel = st.text_input("Seu WhatsApp/Telefone")
+        c_nome, c_tel = st.columns(2)
+        with c_nome: cli_nome = st.text_input("Seu Nome Completo")
+        with c_tel: cli_tel = st.text_input("Seu WhatsApp/Telefone")
 
         st.subheader("2. Escolha o Produto")
         opcoes = {}
+        # Cria um dicionário para mapear a string do selectbox para o objeto produto
         for idx, row in df_disponiveis.iterrows():
-            label = f"{row['nome']} | R$ {row['preco_venda']:.2f} (Disp: {int(row['estoque_pronto'])})"
+            qtd_real = int(row['estoque_pronto'])
+            label = f"{row['nome']} | R$ {row['preco_venda']:.2f} (Disponível: {qtd_real})"
             opcoes[label] = row
 
         produto_selecionado_label = st.selectbox("Selecione uma delícia:", list(opcoes.keys()))
         produto_obj = opcoes[produto_selecionado_label]
         
-        qtd_cliente = st.number_input("Quantidade", min_value=1, max_value=int(produto_obj['estoque_pronto']), step=1)
+        # Input de Quantidade (UI limita, mas backend valida também)
+        max_stock_ui = int(produto_obj['estoque_pronto'])
+        qtd_cliente = st.number_input("Quantidade desejada", min_value=1, max_value=max_stock_ui, step=1)
         
-        obs = st.text_area("Observações (Opcional)", placeholder="Ex: Retiro às 15h...")
+        st.subheader("3. Pagamento")
+        forma_pag = st.selectbox("Como deseja pagar?", ["Pix", "Dinheiro", "Cartão Crédito/Débito", "A Combinar"])
+        
+        obs = st.text_area("Observações (Opcional)", placeholder="Ex: Retiro às 15h, troco para 50...")
 
         submitted = st.form_submit_button("✅ Enviar Pedido")
 
         if submitted:
+            # 1. Validação de Campos
             if not cli_nome or not cli_tel:
-                st.error("Por favor, preencha seu nome e telefone.")
-            else:
-                # Busca item atualizado para garantir que ainda tem estoque
-                item_atualizado = get_doc('produtos_finais', produto_obj['id'])
-                
-                if item_atualizado and item_atualizado['estoque_pronto'] >= qtd_cliente:
-                    total_pedido = item_atualizado['preco_venda'] * qtd_cliente
-                    mes_atual = date.today().strftime("%Y-%m")
+                st.error("⚠️ Por favor, preencha seu NOME e TELEFONE antes de enviar.")
+                st.stop() # Para tudo aqui
 
-                    add_doc('vendas', {
-                        'produto_final_id': item_atualizado['id'], 
-                        'produto_nome': item_atualizado['nome'], 
-                        'cliente_nome': cli_nome, 
-                        'cliente_telefone': cli_tel,
-                        'quantidade': qtd_cliente, 
-                        'total_venda': total_pedido, 
-                        'custo_producao_momento': item_atualizado['custo_producao'], 
-                        'data_criacao': datetime.now().isoformat(), 
-                        'data_finalizacao': None, 
-                        'forma_pagamento': 'A Combinar', 
-                        'status': 'Pendente', 
-                        'mes_referencia': mes_atual,
-                        'origem': 'Link Online',
-                        'obs': obs
-                    })
-                    
-                    update_doc('produtos_finais', item_atualizado['id'], {
-                        'estoque_pronto': item_atualizado['estoque_pronto'] - qtd_cliente
-                    })
-                    
-                    st.success(f"Pedido Realizado! Obrigado, {cli_nome}. Entraremos em contato.")
-                    st.balloons()
-                else:
-                    st.error("Poxa! Alguém acabou de comprar as últimas unidades desse produto ou ele foi removido.")
+            # 2. Validação Rigorosa de Estoque (Backend Check)
+            # Busca o dado fresquinho do banco para garantir que ninguém comprou na frente
+            item_atualizado = get_doc('produtos_finais', produto_obj['id'])
+            
+            if not item_atualizado:
+                st.error("Erro: Produto não encontrado ou removido.")
+                st.stop()
+            
+            estoque_real = int(item_atualizado['estoque_pronto'])
+            
+            if qtd_cliente > estoque_real:
+                st.error(f"🚫 Ops! Estoque insuficiente. Você pediu {qtd_cliente}, mas agora só temos {estoque_real} unidade(s).")
+                st.stop() # TRAVA ABSOLUTA: O código para aqui e NÃO salva nada.
+
+            # 3. Se passou da barreira acima, processa o pedido
+            total_pedido = item_atualizado['preco_venda'] * qtd_cliente
+            mes_atual = date.today().strftime("%Y-%m")
+
+            add_doc('vendas', {
+                'produto_final_id': item_atualizado['id'], 
+                'produto_nome': item_atualizado['nome'], 
+                'cliente_nome': cli_nome, 
+                'cliente_telefone': cli_tel,
+                'quantidade': qtd_cliente, 
+                'total_venda': total_pedido, 
+                'custo_producao_momento': item_atualizado['custo_producao'], 
+                'data_criacao': datetime.now().isoformat(), 
+                'data_finalizacao': None, 
+                'forma_pagamento': forma_pag, 
+                'status': 'Pendente', 
+                'mes_referencia': mes_atual,
+                'origem': 'Link Online',
+                'obs': obs
+            })
+            
+            # Baixar Estoque
+            update_doc('produtos_finais', item_atualizado['id'], {
+                'estoque_pronto': estoque_real - qtd_cliente
+            })
+            
+            st.balloons()
+            st.success(f"Pedido Realizado com Sucesso! Obrigado, {cli_nome}.")
+            st.info("Entraremos em contato pelo WhatsApp para confirmar.")
 
     st.markdown("---")
     st.caption("Sistema de Pedidos Confeitaria")
